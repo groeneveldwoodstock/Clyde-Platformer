@@ -1,2 +1,1 @@
-# Clyde-Platformer
-Simple Platformer Created using the Kaboom JavaScript Library
+Created By Richard Groeneveld

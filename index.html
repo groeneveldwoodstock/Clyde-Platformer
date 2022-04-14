@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <title>Clyde Platformer</title>
+    <meta charset="utf-8">
+    <style>
+        * {
+            margin: 0;
+        }
+        
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+
+
+<body>
+    <script src="https://unpkg.com/kaboom/dist/kaboom.js"></script>
+    <script>
+        
+
+        kaboom({
+            background: [51, 151, 255]
+        })
+        function loadAssets() {
+        loadSprite("bean", "sprites/bean.png");
+        loadSprite("beanl", "sprites/beanl.png");
+        loadSprite("ghosty", "sprites/ghosty.png");
+        loadSprite("spike", "sprites/spikes.png");
+        loadSprite("cloud", "sprites/cloud.png");
+        loadSprite("rock", "sprites/rock.png");
+        loadSprite("box", "sprites/box.png");
+        loadSprite("monster", "sprites/monster.png");
+        loadSprite("grass", "sprites/grass.png");
+        loadSprite("ground", "sprites/ground.png");
+        loadSprite("birdr", "sprites/birdr.png");
+        loadSprite("birdl", "sprites/birdl.png");
+        loadSprite("prize", "sprites/jumpy.png");
+        loadSprite("apple", "sprites/apple.png");
+        loadSprite("portal", "sprites/portal.png");
+        loadSprite("portal2", "sprites/portal2.png");
+        loadSprite("coin", "sprites/coin.png");
+        loadSprite("andrew", "sprites/andrew.png");
+        loadSprite("bottle", "sprites/bottle.png");
+        //loadSound("coin", "sounds/score.ogg");
+        //loadSound("powerup", "sounds/powerup.mp3");
+        //loadSound("blip", "sounds/blip.mp3");
+        //loadSound("hit", "sounds/hit.mp3");
+        //loadSound("portal", "sounds/portal.mp3");
+        }
+        function patrol(speed = 60, dir = 1) {
+            return {
+                id: "patrol",
+                require: [ "pos", "area", ],
+                add() {
+                    this.on("collide", (obj, col) => {
+                        if (col.isLeft() || col.isRight()) {
+                            dir = -dir
+                        }
+                    })
+                },
+                update() {
+                    this.move(speed * dir, 0);
+                },
+            }
+        }
+        function big() {
+            let timer = 0;
+            let isBig = false;
+            let destScale = 1;
+            return {
+                // component id / name
+                id: "big",
+                // it requires the scale component
+                require: [ "scale" ],
+                // this runs every frame
+                update() {
+                    if (isBig) {
+                        timer -= dt();
+                        if (timer <= 0) {
+                            this.smallify();
+                        }
+                    }
+                    this.scale = this.scale.lerp(vec2(destScale), dt() * 6);
+                },
+                // custom methods
+                isBig() {
+                    return isBig;
+                },
+                smallify() {
+                    destScale = 1;
+                    timer = 0;
+                    isBig = false;
+                },
+                biggify(time) {
+                    destScale = 2;
+                    timer = time;
+                    isBig = true;
+                },
+                };
+        }
+        function patrolbird(distance = 10, speed = 60, dir = -1) {
+            return {
+                id: "patrol",
+                require: ["pos", "area",],
+                startingPos: vec2(0, 0),
+                add() {
+                this.startingPos = this.pos;
+                this.onCollide("cloud", (c) =>  {
+                    dir = -dir;
+                    if (dir>0){
+                        this.use(sprite('birdr'))
+                    }
+                    else{
+                        this.use(sprite('birdl'))
+                    }
+                });
+                },
+                update() {
+                if (Math.abs(this.pos.x - this.startingPos.x) >= distance) {
+                    dir = -dir;
+                }
+                this.move(speed * dir, 0);
+                },
+            };
+        }
+
+        loadAssets()
+        coins = 0
+            // define some constants
+        const JUMP_FORCE = 1320
+        const MOVE_SPEED = 480
+        const FALL_DEATH = 2400
+
+        const LEVELS = [
+            [ //0
+                "                          c $ ",
+                "       c                c   $ ",
+                "             c        c     $ ",
+                "   cc       ~       c       $ ",
+                "      c                     $ ",
+                "          $$$     c         $ ",
+                "         ====         =     $ ",
+                "                      g     $ ",
+                "                      g       ",
+                "      ^^  m   =  m b  g      @",
+                "==============g=======g=======",
+            ],
+            [ //1
+                "     $    $    $    $     $",
+                "     $    $    $    $     $",
+                "     $    $    $    $     $",
+                " c            ~   c        ",
+                "                           ",
+                "           ==              ",
+                "                           ",
+                "  r^>   r^> r^> r^>     ^ @",
+                "===========================",
+            ],
+            [ //2
+                "           $               ",
+                "    $      cc   $          ",
+                "    cc         cc          ",
+                "                    $$     ",
+                " c     ~           ccccc   ",
+                "           cc              ",
+                "                           ",
+                "  r >    a >  >        r  @",
+                "===========================",
+            ],
+            [ //3
+                "              >            ",
+                "             ccc           ",
+                "                           ",
+                "                           ",
+                "           a a a b         ",
+                "          ccccccccc        ",
+                "   x                       ",
+                "   x    ^       >     ^   @",
+                "===========================",
+            ],
+            [ //4
+                "    $$$         $   >  $   ",
+                "    ccc  ~  c   cccccccc   ",
+                "         a  cc       $a    ",
+                "    $$  cc   ~  $    cc    ",
+                "    cc      a a a b        ",
+                "    x      ccc ccccc       ",
+                "   xx                 x    ",
+                "  xxx                 xx  @",
+                "===========================",
+            ],
+            [ //5
+                "       $     c            c $         ",
+                "       c      ~    c        $         ",
+                "             c              $         ",
+                "cc    ~  c          c       $         ",
+                "      c             ~       $        c",
+                "          >     c         x           ",
+                "         ====         =   x      $    ",
+                "                      g   x x.   $    ",
+                "                      g   x x         ",
+                "      ^^      = a  b  g   x x x  a   @",
+                "======================g===============",
+            ],
+            [ //6
+                "     $         $          $",
+                "     $         $          $",
+                "     $         $          $",
+                "          c     ~    c     ",
+                "                           ",
+                "               c           ",
+                "   rx                      ",
+                "  rrx   r^> r^> r^>b a  ^ @",
+                "===========================",
+            ],
+            [ //7
+                "  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                "     $         $     x             a      @x",
+                "     $     xxxxxxxxxxx    xxxxxxxxxxxxxxxxxx",
+                "    a                xx                    x",
+                "  xxxxxxx             xxxxx    >           x",
+                "                  x       xxxxxxxxxxxxxx   x",
+                "    xxxxxxxxxxxxxxx                        x",
+                "   xx  > > > a                           rrx",
+                "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            ],
+            [ //8
+                "           b               ",
+                "    $      cc   $          ",
+                "    cc    ~    cc          ",
+                "                   $ > $   ",
+                "           a       ccccc   ",
+                "     c   ~ cc              ",
+                "                           ",
+                "  r >    a >  >        r  @",
+                "===========================",
+            ],
+            [ //9
+                "              >            ",
+                "c  ~         ccc     ~   c ",
+                "                           ",
+                "                           ",
+                "          a a a a b        ",
+                "          ccccccccc    rrrr",
+                "   xc             ~    r  c",
+                "   x            >  r      @",
+                "===========================",
+            ],
+            [ //10
+                "                           ",
+                "c  ~          x      ~   c ",
+                "              x            ",
+                "           >  x        cccc",
+                "           xxxx        c  @",
+                "              x            ",
+                "              x            ",
+                "=  m a    m   x    a  >  ==",
+                "g^^^^^^=^^^^^^^^^^^^=^^^^gg",
+            ],
+            [ //11
+                "    $$  cc                 ",
+                "    $$  cc         a       ",
+                "    $$  cc       cccccc    ",
+                "    $$  cc^       ~   c    ",
+                "    $$  cccccc        cc   ",
+                "    $$$         $   >  c   ",
+                "    ccc         cccccccc   ",
+                "         a  cc      $ ac   ",
+                "    $$  cc   ~  $     c   @",
+                "    cc      a a a b  c    c",
+                "           ccc ccccccc     ",
+                "   xx           x     x    ",
+                "  xxx   ^       x  >  xx   ",
+                "===========================",
+            ],
+            [ //12
+                "                           ",
+                "c  ~    ~   ~   ~    ~   c ",
+                "                           ",
+                "                           ",
+                "                           ",
+                "                           ",
+                "    $$$$$$$$$$$$$$$$$$$   @",
+                "== m a    m              ==",
+                "gg^^^^^^^^^^^^^^^^^^^^^^^gg",
+            ],
+            [ //13
+                "          b              b ",
+                "c  ~     ccc         ~  cc ",
+                "                           ",
+                "                     b     ",
+                "       b#b        bccc     ",
+                "      cccc       ccc       ",
+                "                          @",
+                "== m a    m              ==",
+                "gg^^^^^^^^^^^^^^^^^^^^^^^gg",
+            ],
+            [ //14
+                "          b              b ",
+                "c  ~     ccc         ~  cc ",
+                "                           ",
+                "                     b     ",
+                "       b#b        bccc    @",
+                "       ccc        cccc     ",
+                "                           ",
+                "== m a    m     >        ==",
+                "gg^^^^^^^^^^^^^^^^^^^^^^^gg",
+            ],
+            [ //15
+                " c      ^xx^  ^^^^^^^^^^            ",
+                " c       ^     ^          xxx       ",
+                " c       x  xx^xxxx^                ",
+                " c       x                          ",
+                " c       x        ^          cc     ",
+                " cxax    x                ~         ",
+                " cxxx    x                       c  ",
+                " c       xxx      m          xxx    ",
+                " c          x^^^^^^^^^^^^^^^^       ",
+                " c                   x              ",
+                " c                   x              ",
+                " c  cmc              x              ",
+                " c  xxx              x              ",
+                " c                   x     cc       ",
+                " c            cc     x              ",
+                " c                   x              ",
+                " c                  xx            cc",
+                " c          cc       x              ",
+                " c              ~    x         cc   ",
+                " cmx                 x              ",
+                " cxx             x   x              ",
+                " c     ^^^  ^^   x   xxx            ",
+                " c               x   x              ",
+                " cg   m  gxx     x   x             e",
+                " c ^^^^^^        x   x       cc     ",
+                " c               x   x              ",
+                " c               x   x              ",
+                " c               x   x            cc",
+                " c     cc      m x   x              ",
+                " c       ^^^^^^^^    x              ",
+                " c                   xxx            ",
+                " ccc                 x              ",
+                " c           c  ~    x       cmc    ",
+                " c                   x       xxx    ",
+                " c    ~              x        c     ",
+                "        cc         ccx      a       ",
+                "==========         =================",
+            ],
+        ]
+
+        // define what each symbol means in the level graph
+        const levelConf = {
+            // grid size
+            width: 64,
+            height: 64,
+            // define each object as a list of components
+            "=": () => [
+                sprite("grass"),
+                area(),
+                solid(),
+                origin("bot"),
+            ],
+            "c": () => [
+                sprite("cloud"),
+                area(),
+                solid(),
+                origin("bot"),
+                "cloud",
+            ],
+            "g": () => [
+                sprite("ground"),
+                area(),
+                solid(),
+                origin("bot"),
+            ],
+            "r": () => [
+                sprite("rock"),
+                area(),
+                solid(),
+                origin("bot"),
+            ],
+            "x": () => [
+                sprite("box"),
+                area(),
+                solid(),
+                origin("bot"),
+            ],
+            "$": () => [
+                sprite("coin"),
+                area(),
+                pos(0, -9),
+                origin("bot"),
+                "coin",
+            ],
+            "%": () => [
+                sprite("prize"),
+                area(),
+                solid(),
+                origin("bot"),
+                "prize",
+            ],
+            "b": () => [
+                sprite("bottle"),
+                area(),
+                origin("bot"),
+                body(),
+                "bottle",
+            ],
+            "^": () => [
+                sprite("spike"),
+                area(),
+                solid(),
+                origin("bot"),
+                "danger",
+            ],
+            "#": () => [
+                sprite("apple"),
+                area(),
+                origin("bot"),
+                body(),
+                "apple",
+            ],
+            ">": () => [
+                sprite("ghosty"),
+                area(),
+                origin("bot"),
+                body(),
+                patrol(),
+                "enemy",
+            ],
+            "m": () => [
+                sprite("monster"),
+                area(),
+                origin("bot"),
+                body(),
+                patrol(),
+                "enemy",
+            ],
+            "~": () => [
+                sprite('birdl'),
+                area(),
+                origin("bot"),
+                patrolbird(),
+                "bird",
+            ],
+            "a": () => [
+                sprite("andrew"),
+                area(),
+                origin("bot"),
+                body(),
+                patrol(),
+                "enemy",
+            ],
+            "@": () => [
+                sprite("portal"),
+                area({
+                    scale: 0.5,
+                }),
+                origin("bot"),
+                pos(0, -12),
+                "portal",
+            ],
+            "e": () => [
+                sprite("portal2"),
+                area({
+                    scale: 0.5,
+                }),
+                origin("bot"),
+                pos(0, -12),
+                "portal",
+            ],
+        }
+
+        scene("game", ({
+            levelId,
+            coins,
+            lives
+        } = {
+            levelId: 0,
+            coins: 0,
+            lives: 3
+        }) => {
+
+            gravity(3200)
+
+            // add level to scene
+            const level = addLevel(LEVELS[levelId ?? 0], levelConf)
+
+            // define player object
+            const player = add([
+                sprite("bean"),
+                pos(0, 0),
+                area(),
+                scale(1),
+                // makes it fall to gravity and jumpable
+                body(),
+                // the custom component we defined above
+                big(),
+                origin("bot"),
+            ])
+
+            // action() runs every frame
+            player.onUpdate(() => {
+                // center camera to player
+                camPos(player.pos)
+                    // check fall death
+                if (player.pos.y >= FALL_DEATH) {
+                    if (lives < 1) {
+                        go("lose")
+                    } else {
+                        go("game", {
+                            levelId: levelId,
+                            coins: coins,
+                            lives: lives - 1,
+                        })
+                    }
+                }
+            })
+
+            // if player onCollide with any obj with "danger" tag, lose
+            player.onCollide("danger", () => {
+                if (lives < 1) {
+                    go("lose")
+                } else {
+                    go("game", {
+                        levelId: levelId,
+                        coins: coins,
+                        lives: lives - 1,
+                    })
+                }
+                //play("hit")
+            })
+
+            player.onCollide("portal", () => {
+                //play("portal")
+                if (levelId + 1 < LEVELS.length) {
+                    go("game", {
+                        levelId: levelId + 1,
+                        coins: coins,
+                        lives: lives,
+                    })
+                } else {
+                    go("win")
+                }
+            })
+
+            player.onGround((l) => {
+                if (l.is("enemy")) {
+                    player.jump(JUMP_FORCE * 1.5)
+                    destroy(l)
+                    addKaboom(player.pos)
+                    //play("powerup")
+                }
+            })
+
+            player.onCollide("enemy", (e, col) => {
+                // if it's not from the top, die
+
+                if (!col.isBottom()) {
+                    if (lives < 1) {
+                        go("lose")
+                    } else {
+                        go("game", {
+                            levelId: levelId,
+                            coins: coins,
+                            lives: lives - 1,
+                        })
+                    }
+                    //play("hit")
+                    lives -= 1
+                    livesLabel.text = "Lives: " + lives
+                }
+            })
+            player.onCollide("bird", (b, col) => {
+                if (lives < 1) {
+                    go("lose")
+                } else {
+                    go("game", {
+                        levelId: levelId,
+                        coins: coins,
+                        lives: lives - 1,
+                    })
+                }
+                //play("hit")
+                lives -= 1
+                livesLabel.text = "Lives: " + lives
+            })
+
+            let hasApple = false
+
+            // grow an apple if player's head bumps into an obj with "prize" tag
+            player.onHeadbutt((obj) => {
+                if (obj.is("prize") && !hasApple) {
+                    const apple = level.spawn("#", obj.gridPos.sub(0, 1))
+                    apple.jump()
+                    hasApple = true
+                    //play("blip")
+                }
+            })
+
+            // player grows big onCollide with an "apple" obj
+            player.onCollide("apple", (a) => {
+                destroy(a)
+                    // as we defined in the big() component
+                player.biggify(3)
+                hasApple = false
+                //play("powerup")
+            })
+            player.onCollide("bottle", (b) => {
+                destroy(b)
+                lives += 1
+                livesLabel.text = "Lives: " + lives
+                //play("powerup")
+            })
+
+            let coinPitch = 0
+
+            onUpdate(() => {
+                if (coinPitch > 0) {
+                    coinPitch = Math.max(0, coinPitch - dt() * 100)
+                }
+            })
+
+            player.onCollide("coin", (c) => {
+                destroy(c)
+                //play("coin", {
+                    //detune: coinPitch,
+                //})
+                coinPitch += 100
+                coins += 1
+                coinsLabel.text = "Coins: " + coins
+                if (coins % 10 == 0) {
+                    lives += 1
+                    livesLabel.text = "Lives: " + lives
+                    //play("powerup")
+                }
+            })
+
+            const coinsLabel = add([
+                text("Coins: " + coins),
+                pos(24, 24),
+                fixed(),
+            ])
+            const livesLabel = add([
+                text("Lives: " + lives),
+                pos(24, 78),
+                fixed(),
+            ])
+            const levelLabel = add([
+                text("Level: " + levelId),
+                pos(24, 132),
+                fixed(),
+            ])
+            const rulesLabel = add([
+                text("\nTry and make it\nthrough all of\nthe levels.\n\nGet a new life\nevery 10 coins\nAvoid the obstacles!\n\nPotions add a life!\n\nf for fullscreen\nesc to return\nr for restart current level", {
+                    size: 30,
+                    font: "sinko"
+                }),
+                pos(24, 204),
+                fixed(),
+            ])
+
+            // jump with space
+            onKeyPress("space", () => {
+                // these 2 functions are provided by body() component
+                if (player.isGrounded()) {
+                    player.jump(JUMP_FORCE)
+                }
+            })
+            onKeyPress("up", () => {
+                // these 2 functions are provided by body() component
+                if (player.isGrounded()) {
+                    player.jump(JUMP_FORCE)
+                }
+            })
+            onKeyDown("left", () => {
+                player.use(sprite('beanl'))
+                player.move(-MOVE_SPEED, 0)
+            })
+
+            onKeyDown("right", () => {
+                player.use(sprite('bean'))
+                player.move(MOVE_SPEED, 0)
+            })
+
+            onKeyPress("down", () => {
+                player.weight = 3
+            })
+
+            onKeyRelease("down", () => {
+                player.weight = 1
+            })
+
+            onKeyPress("f", () => {
+                fullscreen(!fullscreen())
+            })
+
+            onKeyPress("r", () => {
+                go("game", {
+                    levelId: levelId,
+                    coins: coins,
+                    lives: lives,
+                })
+            })
+
+        })
+
+        scene("lose", () => {
+            add([
+                text("\n\nYou Lose\n\nPress N To Play Again"),
+            ])
+            onKeyPress("n", () => {
+                go("intro")
+            })
+        })
+
+        scene("win", () => {
+            add([
+                text("\n\nYou Win!\nGreat Job!\nWay to Go!\n\nPress N To Play Again"),
+                pos(24, 10),
+                fixed(),
+            ])
+            onKeyPress("n", () => {
+                go("intro")
+            })
+        })
+
+
+        scene("intro", () => {
+            add([
+                text("Welcome to the Game!"),
+                pos(24, 10),
+                fixed(),
+            ])
+            add([
+                text("\nClick on the screen\nand press a key to play!", {
+                    size: 40,
+                    font: "sinko"
+                }, ),
+                pos(24, 400),
+                fixed(),
+            ])
+            add([
+                text("\nTry and make it\nthrough all of\nthe levels.\n\nGet a new life\nevery 10 coins.\nAvoid the obstacles!\n\nCollect lives for\nthe last level!", {
+                    size: 30,
+                    font: "sinko"
+                }, ),
+                pos(24, 65),
+                fixed(),
+            ])
+            add([sprite("bean"),
+                pos(450, 95),
+                fixed(),
+            ])
+            add([sprite("monster"),
+                pos(550, 95),
+                fixed(),
+            ])
+            onKeyPress(() => go("game"))
+        })
+
+
+        go("intro")
+    </script>
+</body>
+
+</html>
