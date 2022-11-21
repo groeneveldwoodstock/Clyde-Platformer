@@ -12,3 +12,9 @@ Platformer Game Created in Kaboom JavaScript
 
 <img src="https://github.com/groeneveldwoodstock/Clyde-Platformer/blob/main/ScreenShot.png" alt="game image">
   </body>
+<p>
+This project is available on Itch.io
+</p>
+
+[![Underground Adventure by Groeneveld](https://github.com/groeneveldwoodstock/Clyde-Platformer/blob/main/clydeitch.png)](https://groeneveld.itch.io/clyde-platformer)
+</p>
